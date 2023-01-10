@@ -1,0 +1,43 @@
+# Host ports are confined to the 8850-8859 range assigned to this repository.
+#
+# NOTE: neither service has been built or booted. Docker is switched off in the
+# environment this repository was last worked in; these files were authored and
+# parse-checked with `docker compose config` only. See README "Limitations".
+
+services:
+  # The forecasting harness. A batch job, not a server: it runs a backtest and
+  # exits, so it publishes no ports.
+  playground:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: prophet-playaround/playground:local
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PYTHONPATH: /app
+    command:
+      - python
+      - -m
+      - playground
+      - backtest
+      - --dataset=peyton
+      - --per-fold
+
+  # The Jekyll documentation site under docs/ - the reason this repository is
+  # detected as "Python + Ruby". Upstream serves it on 4000; mapped here into
+  # this repository's assigned host range.
+  docs:
+    image: jekyll/jekyll:4
+    profiles: ["docs"]
+    working_dir: /srv/jekyll
+    command: jekyll serve --host 0.0.0.0 --incremental
+    ports:
+      - "8850:4000"
+    volumes:
+      - ./docs:/srv/jekyll

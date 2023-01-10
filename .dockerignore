@@ -1,0 +1,26 @@
+.git
+.github
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.DS_Store
+
+# Compiled artefacts: the image rebuilds these itself.
+python/prophet/stan_model/
+python/prophet/.dylibs/
+python/build/
+python/*.egg-info/
+python_shim/build/
+python_shim/*.egg-info/
+build/
+dist/
+
+# Documentation site and rendered notebooks: ~90 MB of PNGs, PDFs and Jekyll
+# assets that no runtime code reads. Excluding them is the single biggest win
+# in build-context size.
+docs/
+notebooks/

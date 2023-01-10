@@ -1,0 +1,5 @@
+$ node validate.mjs README.md   # mermaid 11.x, mermaid.parse() on each ```mermaid block
+block 1 (graph TD): PARSES OK
+block 2 (sequenceDiagram): PARSES OK
+
+2 mermaid block(s), 0 failed

@@ -1,0 +1,16 @@
+$ python -m playground determinism --dataset peyton --horizon 30
+dataset : peyton (example_wp_log_peyton_manning.csv), 2875 train rows
+horizon : 30
+
+two independent UNSEEDED fits
+  max |delta yhat|        = 0.000e+00
+  max |delta yhat_lower|  = 0.0965
+  max |delta yhat_upper|  = 0.0950
+  mean interval width     = 1.2505
+
+two fits with np.random.seed(1234) before each
+  max |delta yhat|        = 0.000e+00
+  max |delta yhat_lower|  = 0.0000
+  max |delta yhat_upper|  = 0.0000
+
+conclusion: point forecasts are deterministic (MAP fit); interval bounds are not, unless the global RNG is seeded. playground.ProphetForecaster seeds it.
