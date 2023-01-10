@@ -1,0 +1,46 @@
+# Tooling configuration for the FIRST-PARTY code in this repository only.
+#
+# Everything under python/ and python_shim/ is a verbatim copy of
+# facebook/prophet and is excluded from linting and formatting: reformatting a
+# vendored dependency destroys the ability to diff it against upstream, which is
+# the single most useful property this repository has.
+#
+# The vendored package keeps its own build metadata at python/pyproject.toml.
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["playground"]
+addopts = "-ra -m 'not slow'"
+markers = [
+  "slow: fits a real Prophet model; needs a compiled Stan binary. Run with -m slow.",
+]
+filterwarnings = [
+  "ignore::DeprecationWarning:prophet.*",
+  "ignore::FutureWarning:prophet.*",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+# Vendored upstream code: never linted, never formatted.
+extend-exclude = ["python", "python_shim", "notebooks", "docs", "examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RET", "ARG", "PTH", "D"]
+ignore = [
+  "D203",  # incompatible with D211
+  "D213",  # incompatible with D212
+  "D401",  # imperative-mood docstrings are not always the clearest here
+  "D105",  # magic methods are covered by their class docstring
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests: helper classes and fixtures are documented by their names, and
+# reaching into a private attribute is the point of some assertions.
+"playground/tests/*" = [
+  "D100", "D101", "D102", "D103", "D104", "D107",
+  "ARG001", "ARG002", "ARG005", "SLF001",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["playground"]

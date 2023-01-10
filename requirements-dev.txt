@@ -1,0 +1,21 @@
+# Pinned environment for running the vendored Prophet and the playground suite.
+#
+# These pins are not cosmetic. The vendored python/pyproject.toml declares
+# "numpy>=1.15.4" with no upper bound, so a fresh install today resolves NumPy
+# 2.x, and `import prophet` dies on `np.float_` (removed in NumPy 2.0). Likewise
+# cmdstanpy >= 1.2 validates that a CmdStan directory contains a makefile, which
+# the pruned directory shipped inside a Prophet wheel does not.
+#
+#   python -m venv .venv && . .venv/bin/activate
+#   pip install -r requirements-dev.txt
+
+numpy<2
+pandas>=1.5,<2.2
+matplotlib>=3.5
+holidays>=0.25
+tqdm>=4.36.1
+importlib_resources>=5.0
+cmdstanpy>=1.0.4,<1.2
+
+pytest>=7.4
+ruff>=0.4

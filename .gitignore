@@ -1,0 +1,40 @@
+# Compiled Python modules and caches.
+*.pyc
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments.
+.venv/
+venv/
+env/
+
+# Build artefacts of the vendored package. prophet/stan_model holds the
+# compiled Stan binary and a pruned CmdStan tree (~28 MB); it is produced by
+# `pip install -e python/`, never committed.
+python/prophet/stan_model/
+python/prophet/.dylibs
+python/build/
+python/dist/
+python/*.egg-info/
+python_shim/build/
+python_shim/dist/
+python_shim/*.egg-info/
+build/
+dist/
+*.egg-info/
+
+# Persisted models and CmdStan scratch output.
+*.pkl
+*.stanbin
+python/prophet/tests/dask-worker-space/
+dask-worker-space/
+
+# Notebooks.
+.ipynb_checkpoints/
+
+# Editors and OS noise.
+.idea/
+.vscode/
+.DS_Store
+*.*~
