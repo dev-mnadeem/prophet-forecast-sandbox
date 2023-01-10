@@ -167,7 +167,7 @@ class SeasonalNaive:
 
 @register_forecaster("prophet")
 class ProphetForecaster:
-    """Thin, deterministic adapter over the vendored Prophet library.
+    """Thin, deterministic adapter over the Prophet library.
 
     Two things this adds over calling ``Prophet()`` directly:
 

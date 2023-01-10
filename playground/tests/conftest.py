@@ -1,7 +1,7 @@
 """Shared fixtures.
 
-Everything here is tiny and synthetic: the fast suite must not need cmdstan, a
-GPU, or the network.  The one test that really fits Prophet is marked ``slow``
+Everything here is tiny and synthetic: the fast suite must not fit a Stan model
+or need the network.  The one test that really fits Prophet is marked ``slow``
 and deselected by default.
 """
 

@@ -1,10 +1,10 @@
-"""First-party exploration layer for the vendored Prophet snapshot.
+"""First-party backtesting layer over Prophet.
 
-Everything under ``python/`` in this repository is a verbatim copy of
-``facebook/prophet`` and is treated as a read-only third-party dependency.
-``playground`` is the only first-party code here: it wraps that library in a
-reproducible, leakage-safe backtesting harness so forecasting claims made in
-the README can be re-derived from a single command.
+``playground`` wraps the ``prophet`` package (the PyPI wheel pinned in
+``requirements.txt``) in a reproducible, leakage-safe backtesting harness, so
+the forecasting claims made in the README can be re-derived from a single
+command.  The copy of ``facebook/prophet`` under ``python/`` is reference
+material only and is never imported.
 """
 
 from playground.backtest import BacktestResult, FoldResult, backtest

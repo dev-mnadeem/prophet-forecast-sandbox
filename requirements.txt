@@ -1,0 +1,12 @@
+# Runtime dependencies of the playground, pinned exactly so the numbers in
+# README.md and docs/captured/ can be reproduced.
+#
+# Prophet comes from its prebuilt PyPI wheel, which ships a compiled Stan model
+# and a pruned CmdStan. Nothing is compiled at install time. The vendored copy
+# under python/ is kept for reading and diffing against upstream; it is not
+# installed.
+prophet==1.5.0
+cmdstanpy==1.3.2
+numpy==2.5.4
+pandas==3.1.1
+matplotlib==3.11.2

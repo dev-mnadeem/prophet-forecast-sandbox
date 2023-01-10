@@ -1,11 +1,13 @@
-# Local targets come first; they are what you need day to day and none of them
-# require Docker. The docker-* targets are the original upstream entry points.
-.PHONY: help venv install test test-slow lint fmt backtest determinism datasets \
-        docker-build docker-shell docker-py-shell
+# Two ways to run everything: a local virtualenv (first block) or the Docker
+# image (docker-* targets). Neither compiles anything; Prophet installs as a
+# prebuilt wheel.
+.PHONY: help venv install test test-slow lint fmt datasets backtest determinism \
+        docker-build docker-test docker-backtest docker-shell
 
-PYTHON ?= python3
+PYTHON ?= python3.12
 VENV   ?= .venv
 BIN    := $(VENV)/bin
+COMPOSE ?= docker compose
 
 help:  ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -13,22 +15,17 @@ help:  ## Show this help
 
 $(BIN)/python:
 	$(PYTHON) -m venv $(VENV)
-	$(BIN)/python -m pip install --upgrade pip
 
 venv: $(BIN)/python  ## Create the virtualenv
 
-install: venv  ## Install pinned dev deps and the vendored Prophet (compiles CmdStan; slow)
+install: venv  ## Install the pinned runtime and dev dependencies
 	$(BIN)/pip install -r requirements-dev.txt
-	$(BIN)/pip install -e python/
 
-test: ## Run the fast first-party suite (no Stan binary needed)
+test: ## Run the fast suite (no Prophet fits)
 	$(BIN)/python -m pytest playground -q
 
 test-slow: ## Run the tests that really fit Prophet
 	$(BIN)/python -m pytest playground -q -m slow
-
-test-vendored: ## Run the upstream Prophet suite (needs a compiled Stan model)
-	$(BIN)/python -m pytest python/prophet/tests python_shim -q
 
 lint: ## Lint first-party code only (python/ and python_shim/ are vendored)
 	$(BIN)/ruff check playground docker-healthcheck.py
@@ -47,11 +44,14 @@ backtest: ## Prophet vs baselines on identical walk-forward folds
 determinism: ## Measure run-to-run variation in Prophet's output
 	$(BIN)/python -m playground determinism
 
-docker-build: ## Build the runtime image
-	docker compose build
+docker-build: ## Build the image
+	$(COMPOSE) build playground
 
-docker-shell: ## Shell into the runtime image
-	docker compose run --rm playground bash
+docker-test: ## Run both test suites and the linter inside the image
+	$(COMPOSE) run --rm playground sh -c 'python -m pytest playground -q -p no:cacheprovider && python -m pytest playground -q -p no:cacheprovider -m slow && ruff check --no-cache playground docker-healthcheck.py'
 
-docker-py-shell: ## Python REPL inside the runtime image
-	docker compose run --rm playground python
+docker-backtest: ## Run the default backtest inside the image
+	$(COMPOSE) run --rm playground
+
+docker-shell: ## Shell into the image
+	$(COMPOSE) run --rm playground bash

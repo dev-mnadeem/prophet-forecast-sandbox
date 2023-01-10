@@ -1,12 +1,11 @@
 """The only tests that really fit Prophet.
 
-Marked ``slow`` and deselected by default (see ``pyproject.toml``), because the
-fast suite must stay runnable without a compiled Stan model.  Run them with
-``pytest -m slow``.
+Marked ``slow`` and deselected by default (see ``pyproject.toml``), so the
+fast suite never waits on a Stan fit.  Run them with ``pytest -m slow``.
 
-Each one pins a property of the *vendored library* that the harness relies on,
-so an upstream bump that changes the behaviour is caught here rather than in a
-README number.
+Each one pins a property of *Prophet itself* that the harness relies on, so a
+Prophet version bump that changes the behaviour is caught here rather than in
+a README number.
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ from playground.splits import rolling_origin_splits, split_frames
 
 pytestmark = pytest.mark.slow
 
-prophet = pytest.importorskip("prophet", reason="vendored Prophet is not importable")
+prophet = pytest.importorskip("prophet", reason="prophet is not installed")
 
 
 @pytest.fixture(scope="module")

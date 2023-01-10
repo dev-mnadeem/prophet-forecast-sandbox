@@ -1,18 +1,18 @@
 # Tooling configuration for the FIRST-PARTY code in this repository only.
 #
 # Everything under python/ and python_shim/ is a verbatim copy of
-# facebook/prophet and is excluded from linting and formatting: reformatting a
-# vendored dependency destroys the ability to diff it against upstream, which is
-# the single most useful property this repository has.
+# facebook/prophet and is excluded from linting and formatting: reformatting it
+# would destroy the ability to diff it against upstream.
 #
-# The vendored package keeps its own build metadata at python/pyproject.toml.
+# The playground runs against the prophet wheel pinned in requirements.txt; the
+# vendored package keeps its own build metadata at python/pyproject.toml.
 
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["playground"]
 addopts = "-ra -m 'not slow'"
 markers = [
-  "slow: fits a real Prophet model; needs a compiled Stan binary. Run with -m slow.",
+  "slow: fits a real Prophet model (seconds, not milliseconds). Run with -m slow.",
 ]
 filterwarnings = [
   "ignore::DeprecationWarning:prophet.*",
@@ -21,7 +21,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 # Vendored upstream code: never linted, never formatted.
 extend-exclude = ["python", "python_shim", "notebooks", "docs", "examples"]
 

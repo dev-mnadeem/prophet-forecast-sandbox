@@ -170,7 +170,7 @@ def build_parser() -> argparse.ArgumentParser:
     """Assemble the argument parser for ``python -m playground``."""
     parser = argparse.ArgumentParser(
         prog="python -m playground",
-        description="Reproducible, leakage-checked backtests over the vendored Prophet.",
+        description="Reproducible, leakage-checked backtests of Prophet against baselines.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
