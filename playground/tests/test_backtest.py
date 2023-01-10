@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ProcessPoolExecutor
+
 import pandas as pd
 import pytest
 
@@ -69,6 +71,17 @@ def test_map_fn_is_honoured(synthetic_daily):
     result = backtest(synthetic_daily, NaiveLastValue, horizon=10, initial=60, map_fn=counting_map)
     assert calls["n"] == 1
     assert len(result.folds) > 1
+
+
+def test_process_pool_map_matches_serial_run(synthetic_daily):
+    """The docstring's ProcessPoolExecutor example must work: work items get pickled."""
+    serial = backtest(synthetic_daily, NaiveLastValue, horizon=10, initial=60).to_frame()
+    with ProcessPoolExecutor(max_workers=2) as pool:
+        pooled = backtest(
+            synthetic_daily, NaiveLastValue, horizon=10, initial=60, map_fn=pool.map
+        ).to_frame()
+    metrics = ["fold", "cutoff", "n_train", "mae", "rmse", "mape", "smape"]
+    pd.testing.assert_frame_equal(serial[metrics], pooled[metrics])
 
 
 def test_wrong_length_forecast_is_rejected(synthetic_daily):

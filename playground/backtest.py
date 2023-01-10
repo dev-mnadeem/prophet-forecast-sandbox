@@ -14,6 +14,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
+from functools import partial
 
 import pandas as pd
 
@@ -89,11 +90,13 @@ class BacktestResult:
 
 
 def _score_fold(
-    fold_index: int,
-    split: Split,
+    indexed_split: tuple[int, Split],
     df: pd.DataFrame,
     make_model: Callable[[], Forecaster],
 ) -> FoldResult:
+    # Module-level and bound with functools.partial rather than a lambda, so a
+    # process-pool map_fn can pickle each work item.
+    fold_index, split = indexed_split
     train, test = split_frames(df, split)
 
     started = time.perf_counter()
@@ -159,9 +162,10 @@ def backtest(
     map_fn:
         Injection point for parallelism, defaulting to the builtin ``map``.
         Folds are independent, so a caller with spare cores can pass e.g.
-        ``ProcessPoolExecutor(max_workers=4).map``.  Kept as an argument rather
-        than baked in because a Prophet fit is already multi-threaded and
-        over-subscribing cores makes it slower, not faster.
+        ``ProcessPoolExecutor(max_workers=4).map``; ``make_model`` must then be
+        picklable (a class or ``functools.partial``, not a lambda).  Kept as an
+        argument rather than baked in because a Prophet fit is already
+        multi-threaded and over-subscribing cores makes it slower, not faster.
 
     Raises
     ------
@@ -181,12 +185,8 @@ def backtest(
     )
 
     runner = map_fn or map
-    folds = list(
-        runner(
-            lambda item: _score_fold(item[0], item[1], frame, make_model),
-            list(enumerate(splits)),
-        )
-    )
+    score = partial(_score_fold, df=frame, make_model=make_model)
+    folds = list(runner(score, list(enumerate(splits))))
 
     return BacktestResult(model=model_name, dataset=dataset_name, horizon=horizon, folds=folds)
 
