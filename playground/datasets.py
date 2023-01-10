@@ -117,10 +117,11 @@ def file_digest(path: Path) -> str:
 def load_dataset(key: str, *, verify: bool | None = None) -> pd.DataFrame:
     """Load a pinned dataset as a tidy, strictly increasing ``ds``/``y`` frame.
 
-    The frame is sorted by ``ds`` and de-duplicated before it is returned.  That
-    is not cosmetic: :func:`playground.splits.rolling_origin_splits` refuses
-    unsorted input, because a shuffled time series is the cheapest way to
-    introduce look-ahead bias.
+    The frame is sorted by ``ds``, de-duplicated and stripped of rows with no
+    ``y`` before it is returned.  The ordering is not cosmetic:
+    :func:`playground.splits.rolling_origin_splits` refuses unsorted input,
+    because a shuffled time series is the cheapest way to introduce look-ahead
+    bias.
     """
     try:
         spec = DATASETS[key]
@@ -151,8 +152,12 @@ def load_dataset(key: str, *, verify: bool | None = None) -> pd.DataFrame:
     df = df[["ds", "y"]].copy()
     df["ds"] = pd.to_datetime(df["ds"])
     df["y"] = pd.to_numeric(df["y"], errors="coerce")
+    # Rows without an observation are dropped: a fold whose test window holds a
+    # missing actual would otherwise score NaN, and a baseline whose last
+    # training value is missing would forecast NaN everywhere.  The yosemite
+    # series has a dozen such gaps.
     return (
-        df.dropna(subset=["ds"])
+        df.dropna(subset=["ds", "y"])
         .drop_duplicates(subset=["ds"], keep="last")
         .sort_values("ds")
         .reset_index(drop=True)

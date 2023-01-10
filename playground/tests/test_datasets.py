@@ -23,6 +23,7 @@ def test_loader_returns_a_tidy_strictly_increasing_series(key):
     assert len(df) > 0
     assert pd.api.types.is_datetime64_any_dtype(df["ds"])
     assert pd.api.types.is_numeric_dtype(df["y"])
+    assert df["y"].notna().all(), "a missing actual would make every metric NaN"
     assert df["ds"].is_monotonic_increasing
     assert not df["ds"].duplicated().any()
 

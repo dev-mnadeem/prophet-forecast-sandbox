@@ -69,3 +69,9 @@ def test_shape_mismatch_is_an_error():
 def test_empty_forecast_is_an_error():
     with pytest.raises(ValueError, match="empty"):
         rmse([], [])
+
+
+@pytest.mark.parametrize("y_true, y_pred", [([1.0, float("nan")], [1.0, 2.0]), ([1.0], [np.nan])])
+def test_nan_input_is_an_error_not_a_nan_score(y_true, y_pred):
+    with pytest.raises(ValueError, match="NaN"):
+        mae(y_true, y_pred)

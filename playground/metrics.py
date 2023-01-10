@@ -22,6 +22,10 @@ def _prepare(y_true: ArrayLike, y_pred: ArrayLike) -> tuple[np.ndarray, np.ndarr
         raise ValueError(f"shape mismatch: y_true {a.shape} vs y_pred {b.shape}")
     if a.size == 0:
         raise ValueError("cannot score an empty forecast")
+    # A NaN anywhere turns every mean below into NaN, and a NaN MAE then wins or
+    # loses the summary's min() arbitrarily.  Fail where the cause is visible.
+    if np.isnan(a).any() or np.isnan(b).any():
+        raise ValueError("cannot score NaN values; drop missing observations first")
     return a, b
 
 
