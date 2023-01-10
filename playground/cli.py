@@ -1,10 +1,12 @@
 """``python -m playground`` — reproduce every forecasting number in the README.
 
-Two subcommands:
+Subcommands:
 
 * ``datasets`` — list the pinned example series and verify their checksums.
 * ``backtest`` — rolling-origin backtest of one or more registered models on a
   pinned dataset, printing per-fold and aggregate scores.
+* ``determinism`` — measure how far Prophet's output moves between runs.
+* ``plot`` — draw the most recent fold's forecasts against the actuals.
 
 Output is plain text on stdout so it can be redirected into ``docs/captured/``
 and quoted verbatim.
@@ -14,18 +16,30 @@ from __future__ import annotations
 
 import argparse
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from functools import partial
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from playground.backtest import BacktestResult, backtest
-from playground.datasets import DATASETS, ChecksumError, file_digest, load_dataset
+from playground.datasets import DATASETS, ChecksumError, Dataset, file_digest, load_dataset
 from playground.forecasters import (
+    Forecaster,
     available_forecasters,
     get_forecaster,
     silence_stan_logging,
 )
+
+
+def _model_factory(name: str, spec: Dataset, seed: int) -> Callable[[], Forecaster]:
+    """Zero-argument, picklable factory with the per-model settings the CLI uses."""
+    if name == "seasonal_naive":
+        return partial(get_forecaster, name, period=spec.seasonal_period)
+    if name == "prophet":
+        return partial(get_forecaster, name, seed=seed)
+    return partial(get_forecaster, name)
 
 
 def _fmt(value: float | None, places: int = 4) -> str:
@@ -145,12 +159,9 @@ def cmd_backtest(args: argparse.Namespace) -> int:
 
     results: list[BacktestResult] = []
     for name in args.models:
-        kwargs = {"period": spec.seasonal_period} if name == "seasonal_naive" else {}
-        if name == "prophet":
-            kwargs = {"seed": args.seed}
         result = backtest(
             df,
-            lambda n=name, k=kwargs: get_forecaster(n, **k),
+            _model_factory(name, spec, args.seed),
             horizon=args.horizon,
             initial=args.initial,
             period=args.period,
@@ -163,6 +174,27 @@ def cmd_backtest(args: argparse.Namespace) -> int:
             _print_folds(result)
 
     _print_summary(results)
+    return 0
+
+
+def cmd_plot(args: argparse.Namespace) -> int:
+    """Render the most recent fold of a backtest to a PNG."""
+    from playground.plotting import plot_last_fold
+
+    spec = DATASETS[args.dataset]
+    df = load_dataset(args.dataset)
+    factories = {name: _model_factory(name, spec, args.seed) for name in args.models}
+    fig = plot_last_fold(
+        df,
+        factories,
+        horizon=args.horizon,
+        initial=args.initial,
+        context=args.context or 4 * args.horizon,
+        title=f"{args.dataset}: last {args.horizon}-step fold, {', '.join(args.models)}",
+    )
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(args.out, dpi=args.dpi)
+    print(f"wrote {args.out}")
     return 0
 
 
@@ -201,6 +233,24 @@ def build_parser() -> argparse.ArgumentParser:
     det.add_argument("--horizon", type=int, default=30)
     det.add_argument("--seed", type=int, default=1234)
     det.set_defaults(func=cmd_determinism)
+
+    plot = sub.add_parser("plot", help="plot the most recent fold's forecasts to a PNG")
+    plot.add_argument("--dataset", default="peyton", choices=sorted(DATASETS))
+    plot.add_argument(
+        "--models",
+        nargs="+",
+        default=["naive", "seasonal_naive", "prophet"],
+        choices=available_forecasters(),
+    )
+    plot.add_argument("--horizon", type=int, default=30)
+    plot.add_argument("--initial", type=int, default=730)
+    plot.add_argument(
+        "--context", type=int, default=None, help="history shown before the cutoff (4x horizon)"
+    )
+    plot.add_argument("--seed", type=int, default=1234)
+    plot.add_argument("--dpi", type=int, default=110)
+    plot.add_argument("--out", type=Path, required=True, help="PNG path to write")
+    plot.set_defaults(func=cmd_plot)
 
     return parser
 

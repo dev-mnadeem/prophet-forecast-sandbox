@@ -1,8 +1,8 @@
 # playground tests
 
-Fast by design: the default suite fits nothing, needs no network, no GPU and no
-compiled Stan model. Every fixture is a synthetic series of at most a few
-hundred points with a fixed seed.
+Fast by design: the default suite never fits Prophet and needs no network.
+Every fixture is a synthetic series of at most a few hundred points with a
+fixed seed.
 
 | File | What it pins |
 | --- | --- |
@@ -12,6 +12,7 @@ hundred points with a fixed seed.
 | `test_forecasters.py` | The registry seam and the two baselines. |
 | `test_backtest.py` | End-to-end harness behaviour, reproducibility, the `map_fn` seam. |
 | `test_datasets.py` | Dataset checksums and loader tidiness guarantees. |
+| `test_cli.py` | The `datasets`, `backtest` and `plot` subcommands, run in-process on baselines. |
 | `test_prophet_integration.py` | `slow`-marked; real Prophet fits. Run with `pytest -m slow`. |
 
 ## Proving the leakage tests can fail
