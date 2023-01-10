@@ -173,10 +173,10 @@ class ProphetForecaster:
 
     * **A seed.** Prophet draws uncertainty samples from the *global* NumPy RNG
       and seeds it nowhere, so ``yhat_lower``/``yhat_upper`` differ between runs
-      on identical inputs (measured at up to 0.15 on the ``peyton`` series,
-      against a mean interval width of 1.24).  Point forecasts are unaffected
-      because the fit is MAP, not sampled.  Seeding immediately before each fit
-      makes intervals reproducible.
+      on identical inputs (measured at up to 0.11 on the ``peyton`` series,
+      against a mean interval width of 1.24; see docs/captured/determinism.txt).
+      Point forecasts are unaffected because the fit is MAP, not sampled.
+      Seeding immediately before each fit makes intervals reproducible.
     * **Silence.** cmdstanpy logs two INFO lines per fit, which is unreadable
       across a multi-fold backtest.
     """

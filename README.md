@@ -1,182 +1,210 @@
 # prophet_playaround
 
-**This repository is a fork — a vendored copy — of [facebook/prophet](https://github.com/facebook/prophet)
-at v1.1.4.** Everything under `python/`, `python_shim/`, `notebooks/`, `examples/` and the
-Jekyll site in `docs/` is Meta's code and documentation, unmodified. The upstream `R/`
-package was deleted. **259 of the 296 tracked files are byte-identical to the upstream tag.**
+A backtesting playground for [Prophet](https://github.com/facebook/prophet), Meta's
+time-series forecasting library. It answers one question honestly: **on a given series,
+does Prophet beat a trivial baseline on folds it could not have peeked at?**
 
-The original work is one directory: **`playground/`** — 1,742 lines across 17 Python files
-that turn the vendored library into something you can make a claim from. Pinned datasets,
-rolling-origin backtests with the look-ahead invariant enforced per fold, a seeded Prophet
-adapter, and two baselines replayed through the *same* folds. The Dockerfile, the CI
-workflow and this README are first-party too. Nothing else here is.
+The first-party code is `playground/`, a small harness that runs Prophet and two naive
+baselines through the *same* rolling-origin folds, checks the look-ahead invariant on every
+fold, seeds Prophet so its intervals reproduce, and prints or plots the result. Everything
+else of substance in the repository is upstream Prophet, kept for reference.
 
-## Whose code is whose, counted rather than asserted
+![Last walk-forward fold of the Peyton Manning series: history, actuals, and the naive, seasonal-naive and Prophet forecasts with Prophet's 80% interval](docs/screenshots/peyton-last-fold.png)
 
-| Against `facebook/prophet` v1.1.4 | files |
-| --- | ---: |
-| tracked in this repository | 296 |
-| byte-identical to upstream | **259** |
-| differ from upstream | 7 |
-| not present upstream (all first-party) | 30 |
+## What is upstream and what is this project's
 
-Reproduce that yourself:
+| Path | Origin | How it is used here |
+| --- | --- | --- |
+| `playground/` | **This project** | The harness, CLI and its tests. |
+| `Dockerfile`, `docker-compose.yml`, `docker-healthcheck.py`, `Makefile`, `pyproject.toml`, `requirements*.txt`, `.python-version` | **This project** | Build, run and tooling. |
+| `docs/captured/`, `docs/screenshots/` | **This project** | Transcripts and plots quoted in this README. |
+| `python/` | facebook/prophet 1.1.4 (MIT) | Reference copy of the Python package, Stan model and upstream tests. **Not installed or imported.** |
+| `python_shim/` | facebook/prophet (MIT) | Upstream's `fbprophet` compatibility shim. Reference only. |
+| `examples/` | facebook/prophet | The example CSVs. The harness reads five of them. |
+| `notebooks/` | facebook/prophet | Upstream's documentation notebooks. Outputs were stripped from ten of them to drop about 13 MB of embedded images. The cell sources are unchanged. |
+| `docs/` (everything else) | facebook/prophet | Upstream's Jekyll site, served as-is. It documents the library, including the R API, not this project. Only `Gemfile.lock` was re-resolved here (see below). |
+| `LICENSE`, `CODE_OF_CONDUCT.md` | facebook/prophet | Unaltered. |
 
-```bash
-curl -sL https://github.com/facebook/prophet/archive/refs/tags/v1.1.4.tar.gz | tar xz
-diff -rq python/prophet prophet-1.1.4/python/prophet   # no output: identical
+`python/prophet/` and `python/stan/prophet.stan` were checked file by file against the
+PyPI sdist of prophet 1.1.4 and match it exactly. The only differences under `python/` are
+`setup.py` and `pyproject.toml`, which carry two upstream commits from just after that
+release. The sdist's `hdays.py` is generated at build time and is absent here. The vendored
+tree is excluded from linting and formatting, so it can still be diffed against upstream.
+
+## How a backtest runs
+
+```mermaid
+flowchart LR
+    A["examples/*.csv"] -->|"sha256 checked,<br/>sorted, de-duplicated"| B["load_dataset"]
+    B --> C["rolling_origin_splits"]
+    C -->|"assert_no_look_ahead<br/>per fold"| D["split_frames"]
+    D -->|"train: ds, y"| E["make_model().fit"]
+    D -->|"test: ds only"| F["model.predict"]
+    E --> F
+    F --> G["mae / rmse / smape / coverage"]
+    D -->|"test: y"| G
+    G --> H["per-fold rows and summary"]
 ```
 
-Of the seven that differ, five are first-party rewrites of files that exist upstream
-(`README.md`, `Dockerfile`, `docker-compose.yml`, `Makefile`, `.gitignore`) and two are not
-edits at all: `python/setup.py` and `python/pyproject.toml` are *newer* than the v1.1.4 tag,
-carrying two upstream commits from just after the release, so the snapshot is upstream `main`
-a little past the tag.
+- **A fresh model per fold.** `backtest()` takes a factory, not an instance, so no state
+  leaks across cutoffs. Folds are independent, and `map_fn` accepts e.g.
+  `ProcessPoolExecutor().map` to run them in parallel.
+- **Leakage is prevented by construction, then checked.** `fit` receives training rows;
+  `predict` receives timestamps only, so there is no parameter through which a future `y`
+  can reach a model. `assert_no_look_ahead` runs when folds are generated and again when
+  they are materialised.
+- **Pinned data.** Every dataset carries a SHA-256 digest that is verified on load, so a
+  quoted number cannot drift because a CSV changed.
+- **Seeded Prophet.** Prophet draws its uncertainty samples from NumPy's global RNG and
+  seeds it nowhere. `ProphetForecaster` seeds it before `fit` and `predict`.
 
-**No file under `python/prophet/`, `python/stan/`, `python_shim/`, `notebooks/` or
-`examples/` has been modified. The upstream `LICENSE` and every per-file
-`Copyright (c) Facebook, Inc.` header are exactly as they came.** The vendored tree is also
-excluded from linting and formatting: reformatting it would destroy the ability to diff it
-against upstream, which is this repository's most useful property.
+## Running it
 
-## The finding: Prophet against two baselines on identical folds
+### With Docker (no local Python needed)
 
-Every model sees exactly the same five walk-forward folds of the Peyton Manning series.
-The full transcript, with the per-fold rows this block elides, is in
-[`docs/captured/backtest-peyton.txt`](docs/captured/backtest-peyton.txt); re-running it
-reproduced every figure below, per fold and in aggregate, apart from wall-clock seconds.
+```bash
+docker compose build playground
+docker compose run --rm playground            # Peyton backtest, per fold and summary
+docker compose run --rm playground python -m playground datasets
+make docker-test                              # fast suite, slow suite, ruff
+```
+
+The image is `python:3.12-slim` plus pinned wheels. It runs as a non-root user with a
+read-only filesystem and no network. To keep a plot, mount a folder:
+
+```bash
+docker compose run --rm -v "$PWD/out:/out" playground \
+  python -m playground plot --dataset peyton --out /out/peyton.png
+```
+
+On Linux the container user (uid 10001) needs write access to `out/`. Docker Desktop on
+macOS handles that for you.
+
+### With a local virtualenv
+
+```bash
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install -r requirements-dev.txt
+python -m playground backtest --dataset peyton --per-fold
+python -m pytest playground -q            # 67 fast tests, no Prophet fits
+python -m pytest playground -q -m slow    # 4 tests that really fit Prophet
+```
+
+`make help` lists the same steps as targets.
+
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| `python -m playground datasets` | Lists the five pinned series and verifies every checksum. |
+| `python -m playground backtest [--dataset D] [--models ...] [--horizon N] [--initial N] [--period N] [--max-folds N] [--per-fold]` | Scores each model on identical walk-forward folds. |
+| `python -m playground determinism` | Fits Prophet twice unseeded and twice seeded, and reports how far the output moves. |
+| `python -m playground plot --out FILE.png [--dataset D] [--models ...]` | Draws the most recent fold: history, actuals, each model's forecast, and Prophet's interval. |
+
+Datasets: `peyton` (daily log page views), `retail` (monthly sales), `air` (monthly
+airline passengers), `pedestrians` (daily counts across the 2020 COVID shock) and
+`yosemite` (5-minute temperatures). The models are `naive` (last value carried forward),
+`seasonal_naive` (repeat the last seasonal cycle) and `prophet` (library defaults, seeded).
+
+## Results on the Peyton Manning series
+
+Five 30-day folds, an expanding window starting at 730 observations, captured in the Docker
+image with no network ([full transcript](docs/captured/backtest-peyton.txt)):
 
 ```
 $ python -m playground backtest --dataset peyton --horizon 30 --initial 730 --max-folds 5
-dataset   : peyton (example_wp_log_peyton_manning.csv)
-rows      : 2905  span 2007-12-10 .. 2016-01-20
-sha256    : 6b1383a6f458e317c5da0488abaf2cadccd7e80c84c7a543d084e1159d5bfa56
-horizon   : 30   initial: 730   period: 30   max_folds: 5
-
 model            folds      mae     rmse    smape   cover  total_s
 -----------------------------------------------------------------
 naive                5   0.4633   0.6276   0.0281       -     0.00
 seasonal_naive       5   0.6250   0.8753   0.0357       -     0.00
-prophet              5   0.3149   0.4889   0.0188   0.893     2.15 *
+prophet              5   0.3153   0.4896   0.0188   0.893     2.04 *
 
 * lowest mean MAE across identical folds: prophet
 ```
 
-Three readings, the last two mattering more than the headline:
+- Prophet's mean MAE is 32% lower than carrying the last value forward (0.3153 against
+  0.4633).
+- Seasonal-naive comes last. The plot above shows why: its final fold replays the
+  spike from the week before the cutoff every week, and that one fold scores an MAE of 1.39.
+- Nominal 80% intervals covered 89.3% of actuals. They are wider than they need to be,
+  which is a calibration cost, not a win.
 
-- Prophet earns its complexity here — **MAE 0.3149 against 0.4633** for
-  last-value-carried-forward, a 32% reduction, on folds neither model could peek at.
-- **Seasonal-naive is the worst of the three** (0.6250). Weekly seasonality alone is not
-  what makes this series predictable; the fitted trend is.
-- Nominal-80% intervals covered **89.3%** of actuals — conservative, which is a calibration
-  cost, not a win.
+Units are log page views, so `smape` is the column to compare across series. This is five
+folds of one series at library defaults, with no tuning. It is a reproducible measurement,
+not a benchmark. On the vendored 1.1.4 the same run gave 0.3149. The 0.0004 shift comes from
+the newer Prophet and CmdStan in the 1.5.0 wheel.
 
-Units are log page-views, so these are not percentages; `smape` is the comparable column.
-This is five folds of one series at library defaults with no hyperparameter search. It is a
-reproducible measurement, not a benchmark.
+For contrast, on monthly airline passengers the seasonal baseline wins easily, and a test
+pins that (`test_backtest_prints_one_summary_row_per_model`):
 
-## Running it
+![Last 12-month fold of the airline passengers series with naive and seasonal-naive forecasts](docs/screenshots/air-last-fold.png)
 
-```bash
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements-dev.txt
+## Two findings worth knowing
 
-# Baselines only. No compiler, no Stan model, about a second.
-python -m playground backtest --dataset peyton --models naive seasonal_naive
+**Prophet's point forecast is reproducible; its intervals are not.**
+[`docs/captured/determinism.txt`](docs/captured/determinism.txt): two unseeded fits give
+identical `yhat` (`max |delta| = 0`), while the interval bounds move by up to 0.11 against a
+mean interval width of 1.24. Seeding `np.random` before each fit removes that variation
+entirely. Prophet 1.5.0 still has no seed parameter, which is why the adapter seeds the
+global RNG.
 
-# Add Prophet. Compiles CmdStan and python/stan/prophet.stan the first time
-# (tens of minutes), cached afterwards.
-pip install -e python/
-python -m playground backtest --dataset peyton --per-fold
-```
+**One vendored upstream test cannot pass.** `python/prophet/tests/test_prophet.py:61`
+asserts `236 < res < 193`, which no number satisfies. It is marked `slow`, and upstream's
+`conftest.py` skips slow tests unless `--test-slow` is passed, so it never runs by default.
+It is left as upstream wrote it.
 
-`python -m playground {datasets,backtest,determinism} --help` lists the flags; `make help`
-lists the same steps as targets. The pins in `requirements-dev.txt` are a correctness fix,
-not hygiene — the vendored `python/pyproject.toml` declares `numpy>=1.15.4` unbounded, and a
-fresh install today resolves NumPy 2.x, where `import prophet` dies on `np.float_`. They live
-outside the vendored file deliberately.
+## Verification
 
-On macOS arm64 there is no prophet 1.1.4 wheel and CmdStan 2.31 will not build with a
-current clang, so the numbers above came from `python/` on `PYTHONPATH` against a prebuilt
-`prophet_model.bin` — checked first to be a compilation of *this* repository's
-`python/stan/prophet.stan`, which is byte-identical to the 1.1.5 wheel's.
+Captured in [`docs/captured/tests.txt`](docs/captured/tests.txt):
 
-## Why the folds are trustworthy
+| Check | Result |
+| --- | --- |
+| `pytest playground -q` | 67 passed, 4 deselected |
+| `pytest playground -q -m slow` | 4 passed (real Prophet 1.5.0 fits) |
+| `ruff check` / `ruff format --check` | clean, 21 files |
+| `python docker-healthcheck.py` | exit 0 |
 
-Leakage is prevented structurally first. The `Forecaster` protocol takes a training frame
-in `fit` and **timestamps only** in `predict` — there is no parameter through which a future
-`y` could reach a model. On top of that, `assert_no_look_ahead` runs when folds are
-generated *and* again when they are materialised, and `playground/tests/test_leakage.py`
-attacks the invariant from four directions: overlapping index sets, a training window past
-its cutoff, unsorted or duplicated timestamps, and behaviourally — recording the widest
-window a model was ever shown and asserting it ends before the test window begins.
+The leakage tests are known to fail when leakage is introduced.
+[`docs/captured/leakage-injection.txt`](docs/captured/leakage-injection.txt) records a run
+with the guard disabled and the training windows stretched over the test window: 5 failed,
+including 3 in `test_leakage.py`. [`playground/tests/README.md`](playground/tests/README.md)
+explains what each test file pins.
 
-The Prophet-specific one is the fitted scaler: `initialize_scales` derives `y_scale`,
-`start` and `t_scale` from whatever frame it is handed, so fitting once on the full series
-and slicing predictions afterwards is the textbook "scaler fitted on all data" leak.
-`test_scaling_constants_come_from_training_data_only` plants a 500.0 spike inside the first
-test window and asserts `m.y_scale` equals the *training* maximum.
+## Design choices
 
-A guard nobody has watched fail is decoration.
-[`docs/captured/leakage-injection.txt`](docs/captured/leakage-injection.txt) is the
-transcript of a run with the guard stubbed to a no-op and training windows deliberately
-extended over the test window: **5 failed, 54 passed**, three of them in `test_leakage.py`.
-Both injected leaks were reverted immediately; the committed tree is green.
+- **Prophet from the PyPI wheel, not the vendored source.** The 1.1.4 snapshot needs
+  NumPy < 2 and, on a fresh machine, a CmdStan download and compile that takes tens of
+  minutes. The 1.5.0 wheel ships a compiled Stan model for x86-64 and arm64 Linux and
+  macOS, so installing takes seconds and the image needs no compiler. The vendored tree
+  stays as a readable, diffable reference.
+- **Exact pins.** `requirements.txt` pins Prophet, CmdStanPy, NumPy, pandas and Matplotlib
+  exactly, because the README quotes numbers to four decimals.
+- **Baselines ship with the real model.** A Prophet score is only meaningful next to a
+  baseline on the same folds. Adding a model is one class plus one `@register_forecaster`
+  line.
 
-| Suite | Command | Result, re-run for this README |
-| --- | --- | --- |
-| first-party, fast | `pytest playground -q` | 59 passed in 0.60s |
-| first-party, real fits | `pytest playground -q -m slow` | 4 passed, 59 deselected |
-| vendored upstream | `pytest python/prophet/tests python_shim -q` | 67 passed, 2 deselected in 21.7s |
-| lint | `ruff check` / `ruff format --check` | clean, 19 files formatted |
+## Docs site
 
-The fast suite fits nothing — every fixture is a synthetic series of a few hundred seeded
-points — so a broken invariant is reported in under a second and CI needs no compiler.
-See [`playground/tests/README.md`](playground/tests/README.md) for what each file pins.
+`docker compose --profile docs up docs` serves upstream's Jekyll site at
+<http://localhost:8850/prophet/>. The first start installs gems into a named volume, which
+takes a few minutes. The 2021 `docs/Gemfile.lock` (github-pages 209) had 55 known
+advisories, including critical ones in kramdown and commonmarker. It was re-resolved to
+github-pages 233, and `bundle-audit` now reports none.
 
-## Two things that only surfaced because something got measured
+## Limitations
 
-**Prophet's point forecast is reproducible and its intervals are not.**
-[`docs/captured/determinism.txt`](docs/captured/determinism.txt) records two independent
-unseeded fits: `max |delta yhat| = 0.000e+00`, the MAP estimate repeating exactly, while the
-interval bounds moved by up to 0.0965 against a mean width of 1.2505 — about 8% of the
-interval. Prophet draws those bounds from the *global* NumPy RNG and seeds it nowhere, so the
-drift differs every time you look (a re-run for this README gave 0.0892 and 0.1168). Seeding
-`np.random` before each fit collapses it to 0.0000, which is what
-`playground.ProphetForecaster` does; there is no seed parameter to pass instead, because
-v1.1.4 calls `np.random.normal` and friends directly.
-
-**One vendored upstream test cannot pass, for any model.**
-`python/prophet/tests/test_prophet.py:61` reads `assert 236 < res < 193` — unsatisfiable for
-every real number. It sits behind `@pytest.mark.slow`, which upstream's `conftest.py` skips
-unless `--test-slow` is passed, so nobody trips over it; the vendored run in the table above
-is green with it deselected. Run deliberately, it gives `1 failed, 1 passed, 66 deselected`
-and a measured **45.74**, nowhere near the adjacent comment claiming `~ 215.77`. Its sibling
-has the same smell: `# this gives ~ 10.64` above `assert res == pytest.approx(23.44, 0.01)`.
-This fork does not patch it — editing `python/` would forfeit the diff-against-upstream
-property above, and the fix belongs upstream. It is recorded so the number is not mistaken
-for a verified one.
-
-## Out of scope, and not done
-
-- **Docker was not built or booted.** `Dockerfile` and `docker-compose.yml` were written to
-  a multi-stage, non-root, healthchecked standard and `docker compose config` parses them,
-  but the daemon was off in the environment this work ran in. Build verified: *NOT RUN*.
-  Boot verified: *NOT RUN*. Treat them as reviewed source, not as verified artefacts.
-  `docker-healthcheck.py` was executed directly and exits 0.
-- **CI has never run.** `.github/workflows/ci.yml` restores a pipeline the fork had deleted,
-  written against the pinned requirements, with no run history to point at.
-- **Only Python 3.10 was exercised** here; the CI matrix also lists 3.11.
-- **The vendored library is frozen at v1.1.4 and is not maintained here.** Upstream has since
-  shipped macOS arm64 wheels and NumPy 2 support. File library bugs with Meta, not here.
-- **`docs/` is upstream's 8.6 MB Jekyll site**, documenting `facebook/prophet` including the
-  R API this fork removed — kept for provenance, not as documentation of this repository.
-- No hyperparameter search, no interval recalibration, no second dataset in the headline.
+- The vendored `python/` package and its upstream test suite are not executed here. Running
+  them needs NumPy < 2 and a local CmdStan build.
+- Plotly is not installed, so Prophet prints "Importing plotly failed" when it is imported.
+  Its interactive plots are unused. The harness plots with Matplotlib.
+- One series sits behind the headline numbers. There is no hyperparameter search and no
+  interval recalibration.
 
 ## License and attribution
 
-The vendored Prophet code is MIT, **copyright Facebook, Inc. and its affiliates** — see
-[LICENSE](LICENSE), which is upstream's, unaltered, as are all per-file copyright headers.
-[facebook/prophet](https://github.com/facebook/prophet) and its own documentation are the
-authoritative references for the library. The first-party `playground/` code is offered under
-the same MIT terms.
+Prophet is MIT-licensed, copyright Facebook, Inc. and its affiliates. See [LICENSE](LICENSE),
+which is upstream's file, unaltered, as are the per-file copyright headers under `python/`
+and `python_shim/`. Upstream's documentation site in `docs/` carries its own
+[CC BY 4.0 license](docs/LICENSE). This project's own code (`playground/` and the tooling
+listed above) is offered under the same MIT terms. For the library itself, the authoritative
+references are [facebook/prophet](https://github.com/facebook/prophet) and its documentation.
