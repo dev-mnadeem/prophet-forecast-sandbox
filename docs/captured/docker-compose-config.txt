@@ -1,0 +1,29 @@
+$ docker compose config   # parse-only; the daemon was off, nothing was built or booted
+name: prophet_playaround
+services:
+  playground:
+    build:
+      context: /Users/dev/Documents/Projects/WAMO/githubs/all_projects/prophet_playaround
+      dockerfile: Dockerfile
+      target: runtime
+    command:
+      - python
+      - -m
+      - playground
+      - backtest
+      - --dataset=peyton
+      - --per-fold
+    environment:
+      PYTHONPATH: /app
+    image: prophet-playaround/playground:local
+    init: true
+    networks:
+      default: null
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+networks:
+  default:
+    name: prophet_playaround_default
