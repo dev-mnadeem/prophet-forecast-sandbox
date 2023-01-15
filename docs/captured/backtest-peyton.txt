@@ -1,0 +1,37 @@
+$ python -m playground backtest --dataset peyton --horizon 30 --initial 730 --max-folds 5 --per-fold
+dataset   : peyton (example_wp_log_peyton_manning.csv)
+rows      : 2905  span 2007-12-10 .. 2016-01-20
+sha256    : 6b1383a6f458e317c5da0488abaf2cadccd7e80c84c7a543d084e1159d5bfa56
+horizon   : 30   initial: 730   period: 30   max_folds: 5
+
+naive / peyton / horizon=30
+fold  cutoff       n_train      mae     rmse    smape   cover    secs
+   0  2015-08-07      2740   0.2675   0.3148   0.0177       -    0.00
+   1  2015-09-06      2770   0.6337   0.7858   0.0387       -    0.00
+   2  2015-10-06      2800   0.2961   0.3967   0.0183       -    0.00
+   3  2015-11-06      2830   0.6489   1.0527   0.0369       -    0.00
+   4  2015-12-06      2860   0.4704   0.5881   0.0291       -    0.00
+
+seasonal_naive / peyton / horizon=30
+fold  cutoff       n_train      mae     rmse    smape   cover    secs
+   0  2015-08-07      2740   0.3972   0.4626   0.0268       -    0.00
+   1  2015-09-06      2770   0.5970   0.7518   0.0365       -    0.00
+   2  2015-10-06      2800   0.3279   0.4077   0.0202       -    0.00
+   3  2015-11-06      2830   0.4120   0.8072   0.0225       -    0.00
+   4  2015-12-06      2860   1.3906   1.9470   0.0725       -    0.00
+
+prophet / peyton / horizon=30
+fold  cutoff       n_train      mae     rmse    smape   cover    secs
+   0  2015-08-07      2740   0.2067   0.2591   0.0136   1.000    0.65
+   1  2015-09-06      2770   0.2878   0.4340   0.0170   0.900    0.27
+   2  2015-10-06      2800   0.2277   0.3077   0.0141   0.967    0.34
+   3  2015-11-06      2830   0.5255   1.0164   0.0292   0.800    0.34
+   4  2015-12-06      2860   0.3268   0.4272   0.0202   0.800    0.27
+
+model            folds      mae     rmse    smape   cover  total_s
+-----------------------------------------------------------------
+naive                5   0.4633   0.6276   0.0281       -     0.00  
+seasonal_naive       5   0.6250   0.8753   0.0357       -     0.00  
+prophet              5   0.3149   0.4889   0.0188   0.893     1.87 *
+
+* lowest mean MAE across identical folds: prophet

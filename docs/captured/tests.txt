@@ -1,0 +1,28 @@
+# Every suite in this repository, run on 2026-09-25.
+# Python 3.10.21, numpy 1.26.4, pandas 2.1.4, cmdstanpy 1.1.0, ruff 0.14.5.
+
+$ pytest playground -q                          # fast first-party suite
+...........................................................              [100%]
+59 passed, 4 deselected in 0.51s
+
+$ pytest playground -q -m slow                  # first-party tests that really fit Prophet
+....                                                                     [100%]
+4 passed, 59 deselected in 0.51s
+
+$ pytest python/prophet/tests python_shim -q    # VENDORED upstream suite
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+68 passed, 2 deselected, 1 warning in 26.34s
+
+$ pytest python/prophet/tests -m slow --test-slow -q   # VENDORED opt-in tests
+=========================== short test summary info ============================
+FAILED python/prophet/tests/test_prophet.py::TestProphetFitPredictDefault::test_fit_predict_sampling[CMDSTANPY]
+1 failed, 1 passed, 67 deselected in 45.49s
+  (the failure is upstream's: 'assert 236 < res < 193' cannot be satisfied; see README)
+
+$ ruff check playground docker-healthcheck.py
+All checks passed!
+$ ruff format --check playground docker-healthcheck.py
+18 files already formatted
+
+$ python docker-healthcheck.py; echo $?
+0

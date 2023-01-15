@@ -1,0 +1,38 @@
+# Proof that the leakage tests can fail.
+#
+# Two leaks were injected into playground/splits.py:
+#   1. assert_no_look_ahead() short-circuited to a no-op;
+#   2. rolling_origin_splits() built train = [0, cut + horizon), i.e. the
+#      classic "fit on everything, then score the tail" mistake.
+#
+# Both were reverted immediately after this run.
+
+$ pytest playground -q --tb=line
+...............................FF..F.............F........F              [100%]
+=================================== FAILURES ===================================
+E   Failed: DID NOT RAISE LookAheadError
+/Users/dev/Documents/Projects/WAMO/githubs/all_projects/prophet_playaround/playground/tests/test_leakage.py:40: Failed: DID NOT RAISE LookAheadError
+E   Failed: DID NOT RAISE LookAheadError
+/Users/dev/Documents/Projects/WAMO/githubs/all_projects/prophet_playaround/playground/tests/test_leakage.py:56: Failed: DID NOT RAISE LookAheadError
+E   AssertionError: fold 0: model saw data up to 2021-03-11 00:00:00 but the test window starts at 2021-03-02 00:00:00
+    assert Timestamp('2021-03-11 00:00:00') < Timestamp('2021-03-02 00:00:00')
+     +  where Timestamp('2021-03-02 00:00:00') = min()
+     +    where min = 0   2021-03-02\n1   2021-03-03\n2   2021-03-04\n3   2021-03-05\n4   2021-03-06\n5   2021-03-07\n6   2021-03-08\n7   2021-03-09\n8   2021-03-10\n9   2021-03-11\nName: ds, dtype: datetime64[ns].min
+/Users/dev/Documents/Projects/WAMO/githubs/all_projects/prophet_playaround/playground/tests/test_leakage.py:115: AssertionError: fold 0: model saw data up to 2021-03-11 00:00:00 but the test window starts at 2021-03-02 00:00:00
+E   assert [70, 80, 90, 100, 110, 120] == [60, 70, 80, 90, 100, 110]
+      
+      At index 0 diff: 70 != 60
+      Use -v to get more diff
+/Users/dev/Documents/Projects/WAMO/githubs/all_projects/prophet_playaround/playground/tests/test_splits.py:17: assert [70, 80, 90, 100, 110, 120] == [60, 70, 80, 90, 100, 110]
+E   assert [0, 1, 2, 3, 4, 5, ...] == [0, 1, 2, 3, 4, 5, ...]
+      
+      Left contains 10 more items, first extra item: 60
+      Use -v to get more diff
+/Users/dev/Documents/Projects/WAMO/githubs/all_projects/prophet_playaround/playground/tests/test_splits.py:69: assert [0, 1, 2, 3, 4, 5, ...] == [0, 1, 2, 3, 4, 5, ...]
+=========================== short test summary info ============================
+FAILED playground/tests/test_leakage.py::test_overlapping_train_and_test_is_rejected
+FAILED playground/tests/test_leakage.py::test_training_past_the_cutoff_is_rejected
+FAILED playground/tests/test_leakage.py::test_model_is_never_shown_a_row_at_or_after_its_cutoff
+FAILED playground/tests/test_splits.py::test_fold_count_and_shapes - assert [...
+FAILED playground/tests/test_splits.py::test_split_frames_are_contiguous_and_reindexed
+5 failed, 54 passed, 4 deselected in 0.59s
