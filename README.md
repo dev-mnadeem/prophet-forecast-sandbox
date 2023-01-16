@@ -180,3 +180,24 @@ The vendored Prophet code is MIT, **copyright Facebook, Inc. and its affiliates*
 [facebook/prophet](https://github.com/facebook/prophet) and its own documentation are the
 authoritative references for the library. The first-party `playground/` code is offered under
 the same MIT terms.
+
+## Native baseline plot
+
+![Last 30 observed days against two baselines](docs/captured/baseline-holdout.png)
+
+Reproduce with `python -m playground.render_baselines`. This plot uses the
+checksum-verified Peyton series and withholds its final 30 days from both
+baselines. The [underlying values](docs/captured/baseline-holdout.csv) and
+[dataset hash, cutoff, and scores](docs/captured/baseline-holdout.json) are saved
+alongside it. It is one terminal holdout, so its scores are distinct from the
+five-fold comparison above.
+
+The latest native Python 3.12 run passed all 59 fast first-party tests; the
+Prophet integration module was skipped because the compiled vendored model was
+not installed. This plot does not claim to rerun a Prophet fit. The existing
+upstream-build CI job is available through manual workflow dispatch; routine
+pushes run the fast first-party checks.
+
+## Portfolio work
+
+[**Muhammad Nadeem**](https://github.com/dev-mnadeem) — forecasting experiments in [`playground/`](playground/), reproducible baseline plots, tests and repository tooling. Upstream library notices remain with the bundled Prophet distribution.

@@ -1,0 +1,18 @@
+{
+  "dataset": "peyton",
+  "file": "example_wp_log_peyton_manning.csv",
+  "sha256": "6b1383a6f458e317c5da0488abaf2cadccd7e80c84c7a543d084e1159d5bfa56",
+  "rows": 2905,
+  "training_cutoff": "2015-12-21 00:00:00",
+  "horizon": 30,
+  "holdout_mae": {
+    "naive": 0.5404495358170619,
+    "seasonal_naive": 0.5764119143725824
+  },
+  "models": [
+    "naive",
+    "seasonal_naive"
+  ],
+  "note": "Actual pinned series; one terminal holdout, no Prophet fit or synthetic observations.",
+  "command": "python -m playground.render_baselines"
+}
